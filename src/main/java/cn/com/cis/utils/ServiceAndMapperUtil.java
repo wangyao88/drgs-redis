@@ -10,6 +10,7 @@ import cn.com.cis.module.drgsgroup.dao.DiseaseMapper;
 import cn.com.cis.module.drgsgroup.dao.IIntermediateResultDao;
 import cn.com.cis.module.drgsgroup.dao.IResultDataDao;
 import cn.com.cis.module.drgsgroup.dao.OperationMapper;
+import cn.com.cis.module.drgsgroup.service.CounterService;
 import cn.com.cis.module.drgsgroup.service.DiseaseService;
 import cn.com.cis.module.drgsgroup.service.DrgsGroupService;
 import cn.com.cis.module.drgsgroup.service.DrgsItemService;
@@ -40,6 +41,8 @@ public class ServiceAndMapperUtil {
 	private IIntermediateResultDao intermediateResultDao;
 	@Autowired
 	private RedisOperationService redisOperationService;
+	@Autowired
+	private CounterService counterServic;
 	
 	
 	public static ServiceAndMapperUtil getService() {

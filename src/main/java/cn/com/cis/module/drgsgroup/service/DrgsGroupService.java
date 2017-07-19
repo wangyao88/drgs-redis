@@ -31,6 +31,7 @@ import cn.com.cis.module.drgsgroup.manager.DiseaseManager;
 import cn.com.cis.module.drgsgroup.manager.DrgsItemManager;
 import cn.com.cis.module.drgsgroup.manager.OperationManager;
 import cn.com.cis.utils.DateUtil;
+import cn.com.cis.utils.ServiceAndMapperUtil;
 
 import com.google.common.collect.ComparisonChain;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -51,7 +52,7 @@ public class DrgsGroupService {
 	private BlockingQueue<DrgsData> drgsDataQueue = new LinkedBlockingDeque<DrgsData>(2000);
 	private BlockingQueue<Integer> synchronizedQueue = new LinkedBlockingDeque<Integer>(1);
 	private BlockingQueue<Integer> synchronizedRunScriptQueue = new LinkedBlockingDeque<Integer>(1);
-	private static final int INSERT_NUM = 5000;
+	private static final int INSERT_NUM = 1;
 	
     private DrgsGroupService(){
 		int cpuCore = Runtime.getRuntime().availableProcessors();
@@ -115,6 +116,7 @@ public class DrgsGroupService {
 			DrgsResultService.getInstance().setFinishedInsert(true);
 			drgsDataDao.setAllDrgsDataSize(atomicCount,drgsGroupRecord.getGroupNo());
 			drgsDataDao.putAllDrgsDatasToQueue(drgsDataQueue, drgsGroupRecord.getGroupNo());
+			ServiceAndMapperUtil.getService().getCounterServic().startCount();
 			try {
 				drgsDataGroup(drgsGroupRecord,date);
 			} catch (InterruptedException e) {

@@ -61,6 +61,7 @@ public class DrgsResultService {
 				long start = DateUtil.getNowTime();
 				try {
 					ServiceAndMapperUtil.getMapper().getResultDataDao().batchInsertResult(intermediateResults, drgsGroupResults);
+					ServiceAndMapperUtil.getService().getCounterServic().increament(batchNum);
 				} catch (DataAccessException e) {
 					log.error("批量插入出错");
 					e.printStackTrace();
@@ -73,7 +74,8 @@ public class DrgsResultService {
 	
 	private synchronized void etlDrgsResult(final AtomicCount atomicCount, final Long groupNo,final String date) {
 		if(isFinishedInsert){
-			int num = ServiceAndMapperUtil.getMapper().getIntermediateResultDao().getInsertedNum(groupNo);
+//			int num = ServiceAndMapperUtil.getMapper().getIntermediateResultDao().getInsertedNum(groupNo);
+			int num = (int) ServiceAndMapperUtil.getService().getCounterServic().getCount();
         	if(atomicCount.getQueryNum() == num){
         		try {
     				//2.N 调用ETL处理最终结果数据，传批次号参数
@@ -81,16 +83,8 @@ public class DrgsResultService {
 					etlDrgsGroupData.etlExecute();
 					atomicCount.resetQueryNum();
 					log.info("DRGs分组和ETL均已完成!总共耗时{}ms",DateUtil.getTimeBetweenStartAndNow(atomicCount.getGlobalTime()));
-				    String channel = "user:topic";  
-				    //其中channel必须为string，而且“序列化”策略也是StringSerializer  
-				    //消息内容，将会根据配置文件中指定的valueSerializer进行序列化  
-				    //本例中，默认全部采用StringSerializer  
-				    //那么在消息的subscribe端也要对“发序列化”保持一致。  
-				    Message msg = new Message();
-				    msg.setChannel(channel);
-				    msg.setContent("from app 1");
-				    msg.setSendDate(new Date());
-				    ServiceAndMapperUtil.getService().getRedisOperationService().convertAndSend(channel, msg);  
+				    publishMessage();
+				    ServiceAndMapperUtil.getService().getCounterServic().stopCount();
 				} catch (MalformedURLException | EtlExecutorException e) {
 					log.error("调用ETL处理最终结果数据异常:",e.fillInStackTrace());
 				}finally{
@@ -98,6 +92,15 @@ public class DrgsResultService {
 				}
         	}
 		}
+	}
+
+	private void publishMessage() {
+		String channel = "user:topic";  
+		Message msg = new Message();
+		msg.setChannel(channel);
+		msg.setContent("from app 1");
+		msg.setSendDate(new Date());
+		ServiceAndMapperUtil.getService().getRedisOperationService().convertAndSend(channel, msg);
 	}
 
 	public boolean isFinishedInsert() {

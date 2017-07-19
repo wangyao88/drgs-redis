@@ -53,7 +53,7 @@ import cn.com.cis.utils.GetMethodAndValue;
 public class RedisCacheService {
 	
 	@Autowired
-	private RedisTemplate<String, Object> redisTemplate;
+	private RedisTemplate<Object, Object> redisTemplate;
 
 	@Autowired
 	private TbDisgroupMapper tbDisgroupMapper;
@@ -150,7 +150,7 @@ public class RedisCacheService {
 	
 	public void initHbzChargeMccSet(){
 		List<TbHbzChargeMcc> hbzChargeMccList = tbHbzChargeMccMapper.selectAllTbHbzChargeMccs();
-		for(TbHbzChargeMcc tempTbHbzChargeMcc : hbzChargeMccList){
+		for(final TbHbzChargeMcc tempTbHbzChargeMcc : hbzChargeMccList){
 			redisTemplate.opsForSet().add(DataCache.HBZ_CHARGE_MCC_SET, tempTbHbzChargeMcc.getClientCode());
 		}
 		hbzChargeMccList.clear();
@@ -159,7 +159,7 @@ public class RedisCacheService {
 	public void initHbzMccSet(){
 		List<TbHbzMcc> hbzMccList = tbHbzMccMapper.selectTbHbzMcc();
 		for(TbHbzMcc tempTbHbzMcc : hbzMccList){
-			redisTemplate.opsForSet().add(DataCache.HBZ_MCC_SET,tempTbHbzMcc.getIcd10Code().toUpperCase());
+			redisTemplate.opsForSet().add(DataCache.HBZ_MCC_SET, tempTbHbzMcc.getIcd10Code().toUpperCase());
 		}
 		hbzMccList.clear();
 	}
