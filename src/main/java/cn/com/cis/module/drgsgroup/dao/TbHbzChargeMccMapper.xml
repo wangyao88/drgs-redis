@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbHbzChargeMccMapper">
+    <resultMap id="tbHbzChargeMccResult" type="cn.com.cis.module.drgsgroup.entity.TbHbzChargeMcc">
+        <result property="clientCode" column="CLIENT_CODE" />
+    </resultMap>
+
+	<select id="selectAllTbHbzChargeMccs" resultMap="tbHbzChargeMccResult">
+		SELECT
+		    CLIENT_CODE
+		FROM TB_HBZ_CHARGE_MCC
+	</select>
+</mapper>

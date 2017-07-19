@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.IntermediateResultMapper">
+    <resultMap id="intermediateResultResult" type="cn.com.cis.module.drgsgroup.entity.IntermediateResult">
+        <id property="id" column="ID"/>
+        <result property="hisId" column="HISID" />
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="mainOprAdrgs" column="MAIN_OPR_ADRGS" />
+        <result property="diseaseAdrgs" column="DISEASE_ADRGS" />
+        <result property="defaultAdrgs" column="DEFAULT_ADRGS" />
+        <result property="resultAdrg" column="RESULT_ADRG" />
+        <result property="icd10" column="ICD10" />
+        <result property="primaryDiagnosisCode" column="PRIMARY_DIAGNOSIS_CODE" />
+        <result property="icd9" column="ICD9" />
+        <result property="isHasMainOpr" column="IS_HAS_MAIN_OPR" />
+        <result property="mainOprCosts" column="MAIN_OPR_COSTS" />
+        <result property="mainOprDate" column="MAIN_OPR_DATE" jdbcType="DATE"/>
+        <result property="diseaseMdc" column="DISEASE_MDC" />
+        <result property="ccFlag" column="CCFALG" />
+        <result property="otherFactor1" column="OTHER_FACTOR_1" />
+        <result property="otherFactor2" column="OTHER_FACTOR_2" />
+        <result property="otherFactor3" column="OTHER_FACTOR_3" />
+        <result property="ageType" column="AGE_TYPE" />
+        <result property="weightType" column="WEIGHT_TYPE" />
+        <result property="sex" column="SEX" />
+        <result property="matchCount" column="MATCH_COUNT" />
+        <result property="uploadDate" column="UPLOAD_DATE" jdbcType="DATE"/>
+        <result property="drgGroupDate" column="DRG_GROUP_DATE" jdbcType="DATE"/>
+        <result property="drgCode" column="DRG_CODE" />
+        <result property="unMainOprStr" column="UN_MAIN_OPR_STR" />
+        <result property="drgType" column="DRG_TYPE" typeHandler="cn.com.cis.utils.handler.EnumDrgTypeHandler"/>
+    </resultMap>
+    
+
+	<insert id="insertIntermediateResult" parameterType="IntermediateResult">
+        INSERT INTO TD_INTERMEDIATE_RESULT
+           (ID,
+            HISID,
+            GROUP_NO,
+            MAIN_OPR_ADRGS,
+            DISEASE_ADRGS,
+            DEFAULT_ADRGS,
+            RESULT_ADRG,
+            ICD10,
+            PRIMARY_DIAGNOSIS_CODE,
+            ICD9,
+            IS_HAS_MAIN_OPR,
+            MAIN_OPR_COSTS,
+            MAIN_OPR_DATE,
+            DISEASE_MDC,
+            CCFALG,
+            OTHER_FACTOR_1,
+            OTHER_FACTOR_2,
+            OTHER_FACTOR_3,
+            AGE_TYPE,
+            WEIGHT_TYPE,
+            SEX,
+            MATCH_COUNT,
+            UPLOAD_DATE,
+            DRG_GROUP_DATE,
+            DRG_CODE,
+            UN_MAIN_OPR_STR,
+            DRG_TYPE)
+        VALUES
+          (#{id},
+           #{hisId},
+           #{groupNo},
+           #{mainOprAdrgs},
+           #{diseaseAdrgs},
+           #{defaultAdrgs},
+           #{resultAdrg},
+           #{icd10},
+           #{primaryDiagnosisCode},
+           #{icd9},
+           #{isHasMainOpr},
+           #{mainOprCosts},
+           #{mainOprDate,jdbcType=DATE},
+           #{diseaseMdc},
+           #{ccFlag},
+           #{otherFactor1},
+           #{otherFactor2},
+           #{otherFactor3},
+           #{ageType},
+           #{weightType},
+           #{sex},
+           #{matchCount},
+           #{uploadDate,jdbcType=DATE},
+           #{drgGroupDate,jdbcType=DATE},
+           #{drgCode},
+           #{unMainOprStr},
+           #{drgType})
+    </insert>
+    
+    <insert id="batchInsertIntermediateResult" parameterType="java.util.List" useGeneratedKeys="false">
+        INSERT INTO TD_INTERMEDIATE_RESULT
+           (ID,
+            HISID,
+            GROUP_NO,
+            MAIN_OPR_ADRGS,
+            DISEASE_ADRGS,
+            DEFAULT_ADRGS,
+            RESULT_ADRG,
+            ICD10,
+            PRIMARY_DIAGNOSIS_CODE,
+            ICD9,
+            IS_HAS_MAIN_OPR,
+            MAIN_OPR_COSTS,
+            MAIN_OPR_DATE,
+            DISEASE_MDC,
+            CCFALG,
+            OTHER_FACTOR_1,
+            OTHER_FACTOR_2,
+            OTHER_FACTOR_3,
+            AGE_TYPE,
+            WEIGHT_TYPE,
+            SEX,
+            MATCH_COUNT,
+            UPLOAD_DATE,
+            DRG_GROUP_DATE,
+            DRG_CODE,
+            UN_MAIN_OPR_STR,
+            DRG_TYPE)
+        <foreach collection="list" item="item" index="index" separator="union all" >  
+         (SELECT 
+           #{item.id},
+           #{item.hisId},
+           #{item.groupNo},
+           #{item.mainOprAdrgs},
+           #{item.diseaseAdrgs},
+           #{item.defaultAdrgs},
+           #{item.resultAdrg},
+           #{item.icd10},
+           #{item.primaryDiagnosisCode},
+           #{item.icd9},
+           #{item.isHasMainOpr},
+           #{item.mainOprCosts},
+           #{item.mainOprDate,jdbcType=DATE},
+           #{item.diseaseMdc},
+           #{item.ccFlag},
+           #{item.otherFactor1},
+           #{item.otherFactor2},
+           #{item.otherFactor3},
+           #{item.ageType},
+           #{item.weightType},
+           #{item.sex},
+           #{item.matchCount},
+           #{item.uploadDate,jdbcType=DATE},
+           #{item.drgGroupDate,jdbcType=DATE},
+           #{item.drgCode},
+           #{item.unMainOprStr},
+           #{item.drgType} 
+           FROM DUAL)
+        </foreach>  
+    </insert>
+   
+</mapper>

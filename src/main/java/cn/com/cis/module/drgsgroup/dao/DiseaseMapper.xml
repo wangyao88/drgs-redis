@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DiseaseMapper">
+    <resultMap id="diseaseResult" type="cn.com.cis.module.drgsgroup.entity.Disease">
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="hisId" column="HISID" />
+        <result property="diseaseId" column="DISEASE_ID" />
+        <result property="flag" column="FLAG" typeHandler="cn.com.cis.utils.handler.BooleanTypeHandler"/>
+        <association property="drgsData" javaType="cn.com.cis.module.drgsgroup.entity.DrgsData"/>
+    </resultMap>
+
+	<select id="selectAllDiseasesByGroupNoAndHisId" resultMap="diseaseResult" parameterType="cn.com.cis.module.drgsgroup.entity.DrgsData">
+		SELECT
+		    GROUP_NO, 
+			HISID,
+			upper(DISEASE_ID) as DISEASE_ID,
+			FLAG
+		FROM TD_DRGS_DISEASE
+		WHERE GROUP_NO=#{groupNo} AND HISID=#{hisId}
+	</select>
+</mapper>

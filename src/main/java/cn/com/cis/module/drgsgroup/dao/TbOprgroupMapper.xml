@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbOprgroupMapper">
+    <resultMap id="tbOprgroupResult" type="cn.com.cis.module.drgsgroup.entity.TbOprgroup">
+        <result property="icd9Code" column="ICD9_CODE" />
+        <result property="oprgroupCode" column="OPRGROUP_CODE" />
+    </resultMap>
+
+	<select id="selectTbOprgroup" resultMap="tbOprgroupResult">
+		SELECT 
+		    upper(ICD9_CODE) as ICD9_CODE,
+		    OPRGROUP_CODE
+		FROM TB_OPRGROUP
+	</select>
+</mapper>

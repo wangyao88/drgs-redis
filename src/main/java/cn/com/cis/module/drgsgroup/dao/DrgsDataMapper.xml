@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DrgsDataMapper">
+    <resultMap id="drgsDataResult" type="cn.com.cis.module.drgsgroup.entity.DrgsData">
+        <id property="hisId" column="HISID" />
+        <id property="groupNo" column="GROUP_NO" />
+        <result property="patientSex" column="PATIENT_SEX" />
+        <result property="ageType" column="AGE_TYPE" />
+        <result property="weightType" column="WEIGHT_TYPE" />
+        <result property="loadFlag" column="LOAD_FLAG" />
+        <result property="uploadDate" column="UPLOAD_DATE" />
+        <result property="billDate" column="BILL_DATE" />
+        <result property="groupDate" column="GROUP_DATE" />
+		<result property="longterm" column="LONGTERM" />   
+    </resultMap>
+    
+    <select id="selectDrgsDataByHisId" parameterType="java.lang.String" resultMap="drgsDataResult">
+		select *
+        from (select *
+                   from td_drgs_in_hospital l
+		         where l.hisid = #{hisId}
+		         order by l.group_no desc)
+		 where rownum = 1
+    </select>
+    
+</mapper>

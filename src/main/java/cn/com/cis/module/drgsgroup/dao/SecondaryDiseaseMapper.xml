@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.SecondaryDiseaseMapper">
+    <resultMap id="secondaryDiseaseResult" type="cn.com.cis.module.drgsgroup.entity.SecondaryDisease">
+        <result property="icdCode" column="ICD_CODE" />
+        <result property="priorFlag" column="PRIOR_FLAG" />
+    </resultMap>
+
+	<select id="getAllSecondaryDiseases" resultMap="secondaryDiseaseResult">
+		SELECT
+		    ICD_CODE, 
+			PRIOR_FLAG
+		FROM TB_DISEASE_CHANGE
+	</select>
+</mapper>

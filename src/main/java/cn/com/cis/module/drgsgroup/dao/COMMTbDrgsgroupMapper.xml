@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.COMMTbDrgsgroupMapper">
+    <resultMap id="cOMMTbDrgsgroupResult" type="cn.com.cis.module.drgsgroup.entity.COMMTbDrgsgroup">
+        <id property="drgCnCode" column="DRG_CN_CODE" />
+        <result property="drgCnName" column="DRG_CN_NAME" />
+        <result property="drgType" column="DRG_TYPE" typeHandler="cn.com.cis.utils.handler.EnumDrgTypeHandler"/>
+        <result property="oprgroupCode" column="OPRGROUP_CODE" />
+        <result property="ccFlag" column="CC_FLAG" />
+        <result property="otherFactorId1" column="OTHER_FACTOR_ID1" />
+        <result property="otherFactorId2" column="OTHER_FACTOR_ID2" />
+        <result property="otherFactorId3" column="OTHER_FACTOR_ID3" />
+        <result property="drgsSex" column="DRGS_SEX" />
+        <result property="drgsAge" column="DRGS_AGE" />
+        <result property="drgsOutcome" column="DRGS_OUTCOME" />
+        <result property="drgsWeight" column="DRGS_WEIGHT" />
+        <result property="drgsTrtime" column="DRGS_TRTIME" />
+        <result property="flag" column="FLAG" />
+        <result property="dfxzycsFlag" column="DFXZYCS_FLAG" />
+    </resultMap>
+
+	<select id="selectCOMMTbDrgsgroup" resultMap="cOMMTbDrgsgroupResult">
+		SELECT 
+		    DRG_CN_CODE,
+		    DRG_CN_NAME,
+		    DRG_TYPE,
+		    OPRGROUP_CODE,
+		    CC_FLAG,
+		    OTHER_FACTOR_ID1,
+		    OTHER_FACTOR_ID2,
+		    OTHER_FACTOR_ID3,
+		    DRGS_SEX,
+		    DRGS_AGE,
+		    DRGS_OUTCOME,
+		    DRGS_WEIGHT,
+		    DRGS_TRTIME,
+		    FLAG,
+		    DFXZYCS_FLAG
+		FROM COMM.TB_DRGSGROUP
+	</select>
+</mapper>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbHbzExceptionMapper">
+    <resultMap id="tbHbzExceptionResult" type="cn.com.cis.module.drgsgroup.entity.TbHbzException">
+    	<result property="diseaseIcd10Id" column="DISEASE_ICD10_ID" />
+        <result property="exceptType" column="EXCEPT_TYPE" />
+        <result property="exceptIcd10Id" column="EXCEPT_ICD10_ID" />
+    </resultMap>
+
+	<select id="selectTbHbzException" resultMap="tbHbzExceptionResult">
+		SELECT
+			UPPER(DISEASE_ICD10_ID) AS DISEASE_ICD10_ID,
+		    EXCEPT_TYPE,
+		    EXCEPT_ICD10_ID
+		FROM TB_HBZ_EXCEPTION
+	</select>
+</mapper>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.OperationMapper">
+    <resultMap id="operationResult" type="cn.com.cis.module.drgsgroup.entity.Operation">
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="hisId" column="HISID" />
+        <result property="icd9" column="ICD9" />
+        <result property="icd10" column="ICD10" />
+        <result property="flag" column="FLAG" typeHandler="cn.com.cis.utils.handler.BooleanTypeHandler"/>
+        <result property="costs" column="COSTS" />
+        <result property="itemDate" column="ITEM_DATE" />
+        <result property="seqId" column="SEQ_ID"/>
+        <association property="drgsData" javaType="cn.com.cis.module.drgsgroup.entity.DrgsData"/>
+    </resultMap>
+
+	<select id="selectAllOperationsByGroupNoAndHisId" resultMap="operationResult" parameterType="cn.com.cis.module.drgsgroup.entity.DrgsData">
+		SELECT
+		    GROUP_NO, 
+			HISID,
+			ICD9,
+			ICD10,
+			FLAG,
+			COSTS,
+			ITEM_DATE,
+			SEQ_ID
+		FROM TD_DRGS_OPERATION
+		WHERE GROUP_NO=#{groupNo} AND HISID=#{hisId}
+	</select>
+</mapper>

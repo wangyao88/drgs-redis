@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbDfxzycsMapper">
+    <resultMap id="tbDfxzycsResult" type="cn.com.cis.module.drgsgroup.entity.TbDfxzycs">
+        <result property="icd10" column="ICD10" />
+        <result property="bwCode" column="BW_CODE" />
+    </resultMap>
+
+	<select id="selectAllTbDfxzycs" resultMap="tbDfxzycsResult">
+		SELECT
+		    ICD10, 
+			BW_CODE
+		FROM TB_DFXCS
+	</select>
+</mapper>

@@ -1,0 +1,546 @@
+<!DOCTYPE etl SYSTEM "http://scriptella.javaforge.com/dtd/etl.dtd">
+<etl>
+    <properties>
+        <include href="./etl.properties"/>
+    </properties>
+    <!-- drgs数据库连接 -->
+    <connection id="drgConnection" url="${drgConnection.url}" driver="${drgConnection.driver}" user="${drgConnection.user}" password="${drgConnection.password}">
+        autocommit=true
+    </connection>
+    <connection id="log" driver="text" lazy-init="true">
+        format.FROMDATE.type=date
+        format.FROMDATE.pattern=yyyy-MM-dd
+        format.TODATE.type=date
+        format.TODATE.pattern=yyyy-MM-dd
+    </connection>
+    <connection id="jexl" driver="jexl"/>
+    <!-- 定义全局变量 -->
+    <script connection-id="jexl">
+    </script>
+
+
+    <query connection-id="drgConnection">
+        select balance_flag from td_drgs_controll k where k.group_no ='${GROUP_NO}' ;
+        <script>
+            UPDATE TB_INIT_PARAMETER RR SET RR.GROUP_DATE = sysdate;
+        </script>
+        <!--日常流程-->
+        <query if="balance_flag == 0 ">
+            SELECT X.HISID,
+            X.BILLDATE,
+            X.DRGS_CODE,
+            X.DRG_CN_NAME,
+            X.OPR_MAIN_ICD9,
+            CASE
+            WHEN (X.LONGTERM <![CDATA[<>]]> 0 OR X.UNUSUAL_FLAG <![CDATA[<>]]> '0' OR
+            X.DRGS_CODE IS NULL OR X2.DRGS_CODE IS NULL) THEN
+            ''
+            WHEN X.ISUNIJUNCTION = '0' AND
+            X2.REAL_SHORT_TIME <![CDATA[<=]]> X.HOSPITAL_TIME AND
+            X2.REAL_SHORT_AMOUNT <![CDATA[<=]]> X.TOTAL_AMOUNT THEN
+            '1'
+            ELSE
+            '0'
+            END AS DRG_NORMAL_FLAG,
+            CASE
+            WHEN X.TOTAL_AMOUNT > X3.DRGS_LIMIT THEN
+            '1'
+            ELSE
+            '0'
+            END AS DRG_SPEC_FLAG,
+            LONGTERM,
+            CASE
+            WHEN (OPR_MAIN_ICD9 <![CDATA[<>]]> '' AND OPR_COUNT = 0) OR ITEM_COUNT > 0 THEN
+            1
+            WHEN OPR_MAIN_ICD9 IS NULL THEN
+            0
+            ELSE
+            2
+            END AS MAIN_OPERATION_FLAG,
+            UNUSUAL_FLAG,
+            GROUP_DATE,
+            X.ICD10,
+            X.ICD10_1TO16,
+            X.NMAIN_OPR_STR,
+            X.UPLOAD_FLAG,
+            x.MATCH_COUNT
+            FROM (SELECT T.HISID,
+            T.DRGS_CODE,
+            P.DRG_CN_NAME,
+            T.OPR_MAIN_ICD9,
+            SS.BILLDATE,
+            SS.HOSPITAL_ID,
+            TO_CHAR(SS.BILLDATE, 'YYYYMM') AS BILLYM,
+            SS.LONGTERM,
+            SS.UNUSUAL_FLAG,
+            SS.ISUNIJUNCTION,
+            CASE
+            WHEN (TRUNC(SS.DISCHARGE_DATE) - TRUNC(SS.ADMISSION_DATE) = 0) THEN
+            1
+            ELSE
+            TRUNC(SS.DISCHARGE_DATE) - TRUNC(SS.ADMISSION_DATE)
+            END AS HOSPITAL_TIME,
+            SS.TOTAL_AMOUNT,
+            (SELECT COUNT(1)
+            FROM COMM.TD_SM_BILLDETAIL_SS DETAIL
+            INNER JOIN COMM.TB_STDCODEMAPPING STD
+            ON DETAIL.ITEM_ID = STD.CLIENT_CODE
+            INNER JOIN TB_OPR_VALIDATE OPR
+            ON STD.STD_CODE = OPR.ITEM_CODE
+            WHERE T.HISID = DETAIL.PID
+            AND OPR.ICD9_CODE = T.OPR_MAIN_ICD9) AS ITEM_COUNT,
+            (SELECT COUNT(1)
+            FROM TB_OPR_VALIDATE OPR
+            WHERE OPR.ICD9_CODE = T.OPR_MAIN_ICD9) AS OPR_COUNT,
+            T.GROUP_DATE,
+            T.ICD10,
+            T.ICD10_1TO16,
+            T.NMAIN_OPR_STR,
+            T.UPLOAD_FLAG,
+            T.MATCH_COUNT
+            FROM TD_DRGS_GROUP_RESULT T
+            LEFT JOIN COMM.TB_DRGSGROUP P
+            ON T.DRGS_CODE = P.DRG_CN_CODE
+            INNER JOIN COMM.TD_SM_BILL_SS SS
+            ON T.HISID = SS.HISID
+            WHERE T.GROUP_NO = '${GROUP_NO}') X
+            LEFT JOIN TD_FUND_SHORT_TERM_PARM X2
+            ON X.DRGS_CODE = X2.DRGS_CODE
+            AND X.HOSPITAL_ID = X2.HOSPITAL_ID
+            AND X2.DRGS_YEAR = (CASE
+            WHEN SUBSTR(X.BILLYM, 5, 6) >= 07 THEN
+            SUBSTR(X.BILLYM, 1, 4) - 0
+            ELSE
+            SUBSTR(X.BILLYM, 1, 4) - 1
+            END)
+            LEFT JOIN COMM.TB_DRGSGROUP_INFO X3
+            ON X.DRGS_CODE = X3.DRGS_CODE
+            AND X3.YEAR = (CASE
+            WHEN SUBSTR(X.BILLYM, 5, 6) >= 07 THEN
+            SUBSTR(X.BILLYM, 1, 4) - 0
+            ELSE
+            SUBSTR(X.BILLYM, 1, 4) - 1
+            END)
+            AND X3.IS_VALID = 1;
+            <script>
+                insert /*+APPEND NOLOGGING*/ into tr_drgs_result_his(
+                PID                 ,
+                BILLDATE            ,
+                DRGS_CODE           ,
+                DRGS_NAME           ,
+                OPR_MAIN_ICD9       ,
+                DRG_NORMAL_FLAG     ,
+                DRG_SPEC_FLAG       ,
+                LONGTERM            ,
+                MAIN_OPERATION_FLAG ,
+                UNUSUAL_FLAG        ,
+                DRG_GROUP_DATE      ,
+                GROUP_NO            ,
+                ICD10               ,
+                ICD10_1TO16         ,
+                NMAIN_OPR_STR       ,
+                UPLOAD_FLAG         ,
+                MATCH_COUNT)
+                values(
+                ?HISID               ,
+                ?BILLDATE            ,
+                ?DRGS_CODE           ,
+                ?DRG_CN_NAME         ,
+                ?OPR_MAIN_ICD9       ,
+                ?DRG_NORMAL_FLAG     ,
+                ?DRG_SPEC_FLAG       ,
+                ?LONGTERM            ,
+                ?MAIN_OPERATION_FLAG ,
+                ?UNUSUAL_FLAG        ,
+                ?GROUP_DATE          ,
+                '${GROUP_NO}'        ,
+                ?ICD10               ,
+                ?ICD10_1TO16         ,
+                ?NMAIN_OPR_STR       ,
+                ?UPLOAD_FLAG         ,
+                ?MATCH_COUNT );
+            </script>
+        </query>
+
+        <!--月结流程-->
+        <query if="balance_flag == 1 ">
+            <!--select 1 from dual;-->
+            SELECT NVL('${DATE}', MEDICAL_DATE) MEDICAL_DATE,
+            NVL(TO_DATE('${DATE}', 'YYYY-MM'), CLOSE_DATE) CLOSE_DATE,
+            NVL(TO_DATE('${DATE}', 'YYYY-MM'), BGING_DATE) AS BEGING_DATE,
+            NVL(ADD_MONTHS(TO_DATE('${DATE}', 'YYYY-MM'), 1), END_DATE + 1) AS END_DATE
+            FROM TB_INIT_PARAMETER;
+            <script>
+                <!--将月结结果表和状态表中当期医保月数据删除-->
+                delete from  COMM.TR_DRGS_PREPARE_RESULT T WHERE T.YEAR_MONTH = ?MEDICAL_DATE;
+                delete from tr_drgs_result t where t.billdate >= ?BEGING_DATE and t.billdate &lt; ?END_DATE;
+                <!--向状态表中加载月结数据-->
+                INSERT INTO COMM.TR_DRGS_PREPARE_RESULT(YEAR_MONTH,
+                STATUS,
+                BEGING_DATE,
+                END_DATE,
+                CLOSE_DATE,
+                GROUP_DATE)
+                VALUES(?MEDICAL_DATE,
+                '0',
+                ?BEGING_DATE,
+                ?END_DATE,
+                ?CLOSE_DATE,
+                sysdate);
+            </script>
+            <!--月结轨迹表-->
+            <query>
+                SELECT X.HISID,
+                X.BILLDATE,
+                X.DRGS_CODE,
+                X.DRG_CN_NAME,
+                X.OPR_MAIN_ICD9,
+                CASE
+                WHEN (X.LONGTERM <![CDATA[<>]]> 0 OR X.UNUSUAL_FLAG <![CDATA[<>]]> '0' OR
+                X.DRGS_CODE IS NULL OR X2.DRGS_CODE IS NULL) THEN
+                ''
+                WHEN X.ISUNIJUNCTION = '0' AND
+                X2.REAL_SHORT_TIME <![CDATA[<=]]> X.HOSPITAL_TIME AND
+                X2.REAL_SHORT_AMOUNT <![CDATA[<=]]> X.TOTAL_AMOUNT THEN
+                '1'
+                ELSE
+                '0'
+                END AS DRG_NORMAL_FLAG,
+                CASE
+                WHEN X.TOTAL_AMOUNT > X3.DRGS_LIMIT THEN
+                '1'
+                ELSE
+                '0'
+                END AS DRG_SPEC_FLAG,
+                LONGTERM,
+                CASE
+                WHEN OPR_MAIN_ICD9 IS NULL THEN
+                0
+                WHEN (OPR_MAIN_ICD9 IS NOT NULL AND OPR_COUNT = 0) OR
+                ITEM_COUNT > 0 THEN
+                1
+                ELSE
+                2
+                END AS MAIN_OPERATION_FLAG,
+                UNUSUAL_FLAG,
+                GROUP_DATE,
+                X.ICD10,
+                X.ICD10_1TO16,
+                X.NMAIN_OPR_STR,
+                X.UPLOAD_FLAG,
+                X.MATCH_COUNT
+                FROM (SELECT T.HISID,
+                T.DRGS_CODE,
+                P.DRG_CN_NAME,
+                T.OPR_MAIN_ICD9,
+                BILL.BILLDATE,
+                BILL.HOSPITAL_ID,
+                TO_CHAR(BILL.BILLDATE, 'YYYYMM') AS BILLYM,
+                BILL.LONGTERM,
+                BILL.UNUSUAL_FLAG,
+                BILL.ISUNIJUNCTION,
+                CASE
+                WHEN (TRUNC(BILL.DISCHARGE_DATE) -
+                TRUNC(BILL.ADMISSION_DATE) = 0) THEN
+                1
+                ELSE
+                TRUNC(BILL.DISCHARGE_DATE) - TRUNC(BILL.ADMISSION_DATE)
+                END AS HOSPITAL_TIME,
+                BILL.TOTAL_AMOUNT,
+                (SELECT COUNT(1)
+                FROM COMM.TD_SM_BILLDETAIL DETAIL
+                INNER JOIN COMM.TB_STDCODEMAPPING STD
+                ON DETAIL.ITEM_ID = STD.CLIENT_CODE
+                INNER JOIN TB_OPR_VALIDATE OPR
+                ON STD.STD_CODE = OPR.ITEM_CODE
+                WHERE T.HISID = DETAIL.PID
+                AND OPR.ICD9_CODE = T.OPR_MAIN_ICD9
+                AND T.UPLOAD_FLAG = 1) AS ITEM_COUNT,
+                (SELECT COUNT(1)
+                FROM TB_OPR_VALIDATE OPR
+                WHERE OPR.ICD9_CODE = T.OPR_MAIN_ICD9
+                AND T.UPLOAD_FLAG = 1) AS OPR_COUNT,
+                T.GROUP_DATE,
+                T.ICD10,
+                T.ICD10_1TO16,
+                T.NMAIN_OPR_STR,
+                T.UPLOAD_FLAG,
+                T.MATCH_COUNT
+                FROM TD_DRGS_GROUP_RESULT T
+                LEFT JOIN COMM.TB_DRGSGROUP P
+                ON T.DRGS_CODE = P.DRG_CN_CODE
+                INNER JOIN COMM.TD_SM_BILL BILL
+                ON T.HISID = BILL.HISID
+                WHERE T.GROUP_NO = '${GROUP_NO}') X
+                LEFT JOIN TD_FUND_SHORT_TERM_PARM X2
+                ON X.DRGS_CODE = X2.DRGS_CODE
+                AND X.HOSPITAL_ID = X2.HOSPITAL_ID
+                AND X2.DRGS_YEAR = (CASE
+                WHEN SUBSTR(X.BILLYM, 5, 6) >= 07 THEN
+                SUBSTR(X.BILLYM, 1, 4) - 0
+                ELSE
+                SUBSTR(X.BILLYM, 1, 4) - 1
+                END)
+                LEFT JOIN COMM.TB_DRGSGROUP_INFO X3
+                ON X.DRGS_CODE = X3.DRGS_CODE
+                AND X3.YEAR = (CASE
+                WHEN SUBSTR(X.BILLYM, 5, 6) >= 07 THEN
+                SUBSTR(X.BILLYM, 1, 4) - 0
+                ELSE
+                SUBSTR(X.BILLYM, 1, 4) - 1
+                END)
+                AND X3.IS_VALID = 1;
+                <script>
+                    insert /*+APPEND NOLOGGING*/ into tr_drgs_result_his(
+                    PID                 ,
+                    BILLDATE            ,
+                    DRGS_CODE           ,
+                    DRGS_NAME           ,
+                    OPR_MAIN_ICD9       ,
+                    DRG_NORMAL_FLAG     ,
+                    DRG_SPEC_FLAG       ,
+                    LONGTERM            ,
+                    MAIN_OPERATION_FLAG ,
+                    UNUSUAL_FLAG        ,
+                    DRG_GROUP_DATE      ,
+                    GROUP_NO            ,
+                    ICD10               ,
+                    ICD10_1TO16         ,
+                    NMAIN_OPR_STR       ,
+                    UPLOAD_FLAG         ,
+                    MATCH_COUNT)
+                    values(
+                    ?HISID               ,
+                    ?BILLDATE            ,
+                    ?DRGS_CODE           ,
+                    ?DRG_CN_NAME         ,
+                    ?OPR_MAIN_ICD9       ,
+                    ?DRG_NORMAL_FLAG     ,
+                    ?DRG_SPEC_FLAG       ,
+                    ?LONGTERM            ,
+                    ?MAIN_OPERATION_FLAG ,
+                    ?UNUSUAL_FLAG        ,
+                    ?GROUP_DATE          ,
+                    '${GROUP_NO}'        ,
+                    ?ICD10               ,
+                    ?ICD10_1TO16         ,
+                    ?NMAIN_OPR_STR       ,
+                    ?UPLOAD_FLAG         ,
+                    ?MATCH_COUNT );
+                </script>
+            </query>
+            <!--月结结果表-->
+            <query>
+                SELECT HIS.PID,
+                HIS.BILLDATE,
+                A.TOTAL_AMOUNT,
+                A.AREA_CODE,
+                HIS.DRGS_CODE,
+                HIS.ICD10,
+                CASE
+                WHEN HIS.UPLOAD_FLAG = 1 AND HIS.ICD10 IS NOT NULL THEN
+                1
+                WHEN HIS.UPLOAD_FLAG = 0 AND HIS.ICD10 IS NOT NULL THEN
+                2
+                ELSE
+                3
+                END AS ICD10_FLAG,
+                HIS.ICD10_1TO16,
+                HIS.OPR_MAIN_ICD9,
+                CASE
+                WHEN HIS.MATCH_COUNT = 10 THEN
+                1
+                WHEN HIS.MATCH_COUNT &lt; 10 AND HIS.MATCH_COUNT > 0 THEN
+                2
+                ELSE
+                0
+                END AS DRG_MATCH_FLAG,
+                HIS.DRG_NORMAL_FLAG,
+                HIS.NMAIN_OPR_STR,
+                HIS.DRG_SPEC_FLAG,
+                HIS.LONGTERM,
+                CASE
+                WHEN HIS.MATCH_COUNT = 0 THEN
+                1
+                ELSE
+                0
+                END AS PART_FLAG,
+                HIS.MAIN_OPERATION_FLAG,
+                A.DISCHARGE_DISEASE_ID_ORG,
+                A.ICD10_1TO16_ORG,
+                CASE  WHEN HIS.LONGTERM = 1 THEN
+                LEAST((CASE  WHEN A.ZYTS <![CDATA[<=]]> 50 THEN
+                A.ZYTS * 270
+                WHEN A.ZYTS >= 51 AND A.ZYTS <![CDATA[<=]]> 100 THEN
+                (A.ZYTS - 50) * 240 + 50*270
+                WHEN A.ZYTS >= 101 AND A.ZYTS <![CDATA[<=]]> 200 THEN
+                (A.ZYTS - 100) * 210 + 50*270 + 50*240
+                ELSE
+                (A.ZYTS - 200) * 180 + 100*210  + 50*270 + 50*240
+                END) - (BMI_CONVERED_AMOUNT - (A.TOTAL_AMOUNT-(GBZFJE+GRZH+LARGE_AMOUNT_MONEY+CASH_PAY))),
+                A.TOTAL_AMOUNT-(GBZFJE+GRZH+LARGE_AMOUNT_MONEY+CASH_PAY))
+                WHEN HIS.LONGTERM = 2 THEN
+                (CASE WHEN (A.ZYTS-15) * 300 &lt; 0 THEN 0 ELSE (A.ZYTS-15) * 300 END)
+                WHEN HIS.LONGTERM = 3 THEN
+                A.ZYTS * 100
+                END AS PAY_FUND_SPEC
+                FROM TR_DRGS_RESULT_HIS HIS
+                INNER JOIN
+                (SELECT HISID,
+                BILL.TOTAL_AMOUNT,
+                BILL.AREA_CODE,
+                CASE WHEN L.ID IS NOT NULL THEN L.DISCHARGE_DISEASE_ID ELSE BILL.DISCHARGE_DISEASE_ID END AS DISCHARGE_DISEASE_ID_ORG,
+                CASE WHEN L.ID IS NOT NULL THEN 
+                RTRIM(DECODE(L.DIAGNOSIS_CODE1,'','',L.DIAGNOSIS_CODE1||',')||
+                DECODE(L.DIAGNOSIS_CODE2,'','',L.DIAGNOSIS_CODE2||',')||
+                DECODE(L.DIAGNOSIS_CODE3,'','',L.DIAGNOSIS_CODE3||',')||
+                DECODE(L.DIAGNOSIS_CODE4,'','',L.DIAGNOSIS_CODE4||',')||
+                DECODE(L.DIAGNOSIS_CODE5,'','',L.DIAGNOSIS_CODE5||',')||
+                DECODE(L.DIAGNOSIS_CODE6,'','',L.DIAGNOSIS_CODE6||',')||
+                DECODE(L.DIAGNOSIS_CODE7,'','',L.DIAGNOSIS_CODE7||',')||
+                DECODE(L.DIAGNOSIS_CODE8,'','',L.DIAGNOSIS_CODE8||',')||
+                DECODE(L.DIAGNOSIS_CODE9,'','',L.DIAGNOSIS_CODE9||',')||
+                DECODE(L.DIAGNOSIS_CODE10,'','',L.DIAGNOSIS_CODE10||',')||
+                DECODE(L.DIAGNOSIS_CODE11,'','',L.DIAGNOSIS_CODE11||',')||
+                DECODE(L.DIAGNOSIS_CODE12,'','',L.DIAGNOSIS_CODE12||',')||
+                DECODE(L.DIAGNOSIS_CODE13,'','',L.DIAGNOSIS_CODE13||',')||
+                DECODE(L.DIAGNOSIS_CODE14,'','',L.DIAGNOSIS_CODE14||',')||
+                DECODE(L.DIAGNOSIS_CODE15,'','',L.DIAGNOSIS_CODE15||',')||
+                DECODE(L.DIAGNOSIS_CODE16,'','',L.DIAGNOSIS_CODE16),',')
+                ELSE 
+                RTRIM(DECODE(BILL.DISEASE_ID,'','',BILL.DISEASE_ID||',')||
+                DECODE(BILL.SECOND_DISEASE_ID,'','',BILL.SECOND_DISEASE_ID||',')||
+                DECODE(BILL.THIRD_DISEASE_ID,'','',BILL.THIRD_DISEASE_ID||',')||
+                DECODE(BILL.DIAGNOSIS_FOUR,'','',BILL.DIAGNOSIS_FOUR||',')||
+                DECODE(BILL.DIAGNOSIS_FIVE,'','',BILL.DIAGNOSIS_FIVE||',')||
+                DECODE(BILL.DIAGNOSIS_SIX,'','',BILL.DIAGNOSIS_SIX||',')||
+                DECODE(BILL.DIAGNOSIS_SEVEN,'','',BILL.DIAGNOSIS_SEVEN||',')||
+                DECODE(BILL.DIAGNOSIS_EIGHT,'','',BILL.DIAGNOSIS_EIGHT||',')||
+                DECODE(BILL.DIAGNOSIS_NINE,'','',BILL.DIAGNOSIS_NINE||',')||
+                DECODE(BILL.DIAGNOSIS_TEN,'','',BILL.DIAGNOSIS_TEN||',')||
+                DECODE(BILL.DIAGNOSIS_ELEVEN,'','',BILL.DIAGNOSIS_ELEVEN||',')||
+                DECODE(BILL.DIAGNOSIS_TWELVE,'','',BILL.DIAGNOSIS_TWELVE||',')||
+                DECODE(BILL.DIAGNOSIS_THIRTEEN,'','',BILL.DIAGNOSIS_THIRTEEN||',')||
+                DECODE(BILL.DIAGNOSIS_FOURTEEN,'','',BILL.DIAGNOSIS_FOURTEEN||',')||
+                DECODE(BILL.DIAGNOSIS_FIFTEEN,'','',BILL.DIAGNOSIS_FIFTEEN||',')||
+                DECODE(BILL.DIAGNOSIS_SIXTEEN,'','',BILL.DIAGNOSIS_SIXTEEN),',') END AS ICD10_1TO16_ORG,
+                TRUNC(BILL.DISCHARGE_DATE) - TRUNC(BILL.ADMISSION_DATE) + 1 AS ZYTS,
+                BMI_CONVERED_AMOUNT,
+                SUPPLEMENT_PUB_MONEY AS GBZFJE,
+                (BASE_ACCOUNT_MONTY+SUPPLEMENT_MONEY+BASE_ACCOUNT_MONTY_Y+SUPPLEMENT_MONEY_Y) AS GRZH,
+                LARGE_AMOUNT_MONEY,
+                CASH_PAY
+                FROM COMM.TD_SM_BILL BILL
+                LEFT JOIN COMM.TD_MR_MEDICAL L 
+                  ON BILL.ADMISSION_NUMBER = L.ADMISSION_NO
+                 AND BILL.HOSPITAL_ID = L.HOSPTIAL_ID
+                 AND L.IS_UPLOAD = 1 --已上传数据
+                 AND L.IS_VALID = 0  --有效
+                 AND L.IS_GROUP_AVAILABLE = 1) A
+                ON HIS.PID = A.HISID
+                WHERE HIS.GROUP_NO = '${GROUP_NO}';
+                <script>
+                    insert /*+APPEND NOLOGGING*/ into drgs_group.TR_DRGS_RESULT(
+                    PID                     ,
+                    BILLDATE                ,
+                    TOTAL_AMOUNT            ,
+                    AREA_CODE               ,
+                    DRGS_CODE               ,
+                    ICD10                   ,
+                    ICD10_FLAG              ,
+                    ICD10_1TO16             ,
+                    OPR_MAIN_ICD9           ,
+                    DRG_MATCH_FLAG          ,
+                    DRG_NORMAL_FLAG         ,
+                    NMAIN_OPR_STR           ,
+                    DRG_SPEC_FLAG           ,
+                    LONGTERM                ,
+                    PART_FLAG               ,
+                    MAIN_OPERATION_FLAG     ,
+                    DISCHARGE_DISEASE_ID_ORG,
+                    ICD10_1TO16_ORG         ,
+                    PAY_FUND_SPEC)
+                    values(
+                    ?PID                     ,
+                    ?BILLDATE                ,
+                    ?TOTAL_AMOUNT            ,
+                    ?AREA_CODE               ,
+                    ?DRGS_CODE               ,
+                    ?ICD10                   ,
+                    ?ICD10_FLAG              ,
+                    ?ICD10_1TO16             ,
+                    ?OPR_MAIN_ICD9           ,
+                    ?DRG_MATCH_FLAG          ,
+                    ?DRG_NORMAL_FLAG         ,
+                    ?NMAIN_OPR_STR           ,
+                    ?DRG_SPEC_FLAG           ,
+                    ?LONGTERM                ,
+                    ?PART_FLAG               ,
+                    ?MAIN_OPERATION_FLAG     ,
+                    ?DISCHARGE_DISEASE_ID_ORG,
+                    ?ICD10_1TO16_ORG         ,
+                    ?PAY_FUND_SPEC
+                    );
+                </script>
+            </query>
+            <!--校验数据-->
+            <query>
+                SELECT CASE WHEN (A.NUM - B.NUM + A.TOTAL_AMOUNT - B.TOTAL_AMOUNT = 0) THEN 0 ELSE 1 END as valid,
+                A.NUM,
+                A.TOTAL_AMOUNT
+                FROM (SELECT COUNT(1) NUM, SUM(LL.TOTAL_AMOUNT) TOTAL_AMOUNT
+                FROM TR_DRGS_RESULT LL
+                WHERE LL.BILLDATE >= ?BEGING_DATE
+                AND LL.BILLDATE &lt; ?END_DATE) A
+                CROSS JOIN (SELECT COUNT(1) NUM, SUM(A.TOTAL_AMOUNT) TOTAL_AMOUNT
+                FROM COMM.TD_SM_BILL A --结算表
+                INNER JOIN COMM.TB_HOSPITAL_VALID A0
+                ON A.HOSPITAL_ID = A0.HOSPITAL_ID
+                INNER JOIN COMM.TB_CLAIMTYPE Z --获取住院类型
+                ON A.CLAIM_TYPE = Z.CLASS_ID
+                LEFT JOIN COMM.TB_BENEFIT_GROUP_ID Z3 --基金分类表
+                ON A.BENEFIT_GROUP_ID = Z3.CLASS_ID
+                WHERE Z.P_ID = '1'
+                AND A.BILLDATE >= ?BEGING_DATE
+                AND A.BILLDATE &lt; ?END_DATE
+                AND Z3.PARENT_CLASS_ID IN ('200', '202')
+                AND A.UNUSUAL_FLAG = '0') B;
+                <script if="valid==0">
+                    <!--更新状态表-->
+                    UPDATE COMM.TR_DRGS_PREPARE_RESULT T SET T.STATUS = '1',
+                    T.GROUP_COUNT = ?NUM,
+                    T.BILL_COUNT = ?TOTAL_AMOUNT
+                    WHERE T.YEAR_MONTH = ?MEDICAL_DATE;
+                    <!--获取分组数据版本-->
+                    MERGE INTO COMM.TD_DRGS_LOGIC_VERSION_MON M
+                    USING (SELECT N.LOGIC_VERSION
+                    FROM COMM.TD_DRGS_LOGIC_VERSION N
+                    WHERE N.FLAG = '1') N
+                    ON (M.YEAR_MONTH = ?MEDICAL_DATE)
+                    WHEN MATCHED THEN
+                    UPDATE SET M.LOGIC_VERSION = N.LOGIC_VERSION
+                    WHEN NOT MATCHED THEN
+                    INSERT
+                    (M.YEAR_MONTH, M.LOGIC_VERSION)
+                    VALUES
+                    (?MEDICAL_DATE, N.LOGIC_VERSION);
+                    <!--更新参数表-->
+                    UPDATE TB_INIT_PARAMETER R SET R.MEDICAL_DATE = TO_CHAR(ADD_MONTHS(TO_DATE(MEDICAL_DATE,'YYYY-MM'),1),'YYYY-MM'),
+                    R.BGING_DATE = ADD_MONTHS(BGING_DATE,1),
+                    R.END_DATE = ADD_MONTHS(END_DATE,1),
+                    R.CLOSE_DATE = ADD_MONTHS(CLOSE_DATE,1),
+                    R.LAST_CLOSE_DATE = R.CLOSE_DATE
+                    WHERE '${DATE}' IS NULL;
+                </script>
+                <script if="valid==1">
+                    <!--更新状态表-->
+                    UPDATE COMM.TR_DRGS_PREPARE_RESULT T SET
+                    T.GROUP_COUNT = ?NUM,
+                    T.BILL_COUNT = ?TOTAL_AMOUNT
+                    WHERE T.YEAR_MONTH = ?MEDICAL_DATE;
+                </script>
+            </query>
+        </query>
+    </query>
+
+</etl>

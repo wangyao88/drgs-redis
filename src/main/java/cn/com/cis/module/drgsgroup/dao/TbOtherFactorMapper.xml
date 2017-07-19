@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbOtherFactorMapper">
+    <resultMap id="tbOtherFactorResult" type="cn.com.cis.module.drgsgroup.entity.TbOtherFactor">
+        <result property="oprgroupCode" column="OPRGROUP_CODE" />
+        <result property="otherFactorId" column="OTHER_FACTOR_ID" />
+        <result property="factorItemId" column="FACTOR_ITEM_ID" />
+    </resultMap>
+
+	<select id="selectAllTbOtherFactors" resultMap="tbOtherFactorResult">
+		SELECT
+		    OPRGROUP_CODE, 
+			OTHER_FACTOR_ID,
+			FACTOR_ITEM_ID
+		FROM TB_OTHER_FACTOR
+	</select>
+</mapper>

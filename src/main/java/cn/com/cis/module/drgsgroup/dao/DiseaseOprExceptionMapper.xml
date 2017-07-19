@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DiseaseOprExceptionMapper">
+    <resultMap id="diseaseOprExceptionResult" type="cn.com.cis.module.drgsgroup.entity.DiseaseOprException">
+        <result property="icd9Code" column="ICD9_CODE" />
+        <result property="icd10Code" column="ICD10_CODE" />
+    </resultMap>
+
+	<select id="selectDiseaseOprException" resultMap="diseaseOprExceptionResult">
+		SELECT 
+		    ICD9_CODE,
+		    ICD10_CODE
+		FROM tb_disease_opr_exception
+	</select>
+</mapper>

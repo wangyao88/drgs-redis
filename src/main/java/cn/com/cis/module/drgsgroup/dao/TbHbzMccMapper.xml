@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.TbHbzMccMapper">
+    <resultMap id="tbHbzMccResult" type="cn.com.cis.module.drgsgroup.entity.TbHbzMcc">
+        <result property="icd10Code" column="ICD10_CODE" />
+    </resultMap>
+
+	<select id="selectTbHbzMcc" resultMap="tbHbzMccResult">
+		SELECT 
+		    ICD10_CODE
+		FROM TB_HBZ_MCC
+	</select>
+</mapper>

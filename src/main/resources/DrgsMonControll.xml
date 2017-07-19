@@ -1,0 +1,368 @@
+<!DOCTYPE etl SYSTEM "http://scriptella.javaforge.com/dtd/etl.dtd">
+<etl>
+    <properties>
+        <include href="./etl.properties"/>
+    </properties>
+    <!-- drgs数据库连接 -->
+    <connection id="drgConnection" url="${drgConnection.url}" driver="${drgConnection.driver}" user="${drgConnection.user}" password="${drgConnection.password}">
+        autocommit.size=20000
+    </connection>
+    <connection id="log" driver="text" lazy-init="true">
+        format.FROMDATE.type=date
+        format.FROMDATE.pattern=yyyy-MM-dd
+        format.TODATE.type=date
+        format.TODATE.pattern=yyyy-MM-dd
+    </connection>
+
+    <connection id="jexl" driver="jexl"/>
+    <!-- 定义全局变量 -->
+    <script connection-id="jexl">
+        etl.globals['group_no']=etl.getDate().now("yyyyMMddHHmmssSSS");
+    </script>
+
+
+    <!-- 月结流程 -->
+    <query connection-id="drgConnection">
+        select nvl('${DATE}',to_char(sysdate,'yyyy-mm-dd')) systime,
+        nvl('${DATE}',to_char(close_date,'yyyy-mm-dd')) close_date ,
+        nvl(to_date('${DATE}','yyyy-mm'),bging_date) as beging_date,
+        nvl(add_months(to_date('${DATE}','yyyy-mm'),1),end_date+1) as end_date from tb_init_parameter;
+
+        <!--判断当前时间是否为截止日或者重刷月结数据-->
+        <query if="systime == close_date">
+            select 1 from dual;
+            <script >
+                <!-- 向分组控制表中添加需处理的任务好(group_no)、分组状态(group_state)和分组类型(0日常分组1为月结分组) -->
+                insert into td_drgs_controll
+                (group_no,
+                group_state,
+                balance_flag)
+                select
+                ${etl.globals['group_no']},
+                0,
+                1
+                from dual;
+                commit;
+            </script>
+
+            <!-- 月结分组流程、主单批次选取 -->
+            <query>
+                SELECT
+                A.HISID,
+                A.PATIENT_SEX,
+                A.AGE_TYPE,
+                A.WEIGHT_TYPE,
+                A.LOAD_FLAG,
+                A.UPLOAD_DATE,
+                A.BILL_DATE,
+                A.GROUP_DATE,
+                A.LONGTERM
+                FROM (SELECT L.HISID,
+                L.PATIENT_SEX,
+                CASE
+                WHEN (L.ADMISSION_DATE -
+                NVL(ML.NEWBORN_DATE, L.PATIENT_BIRTH)) &lt; 29 THEN
+                '3'
+                WHEN L.ADMISSION_DATE -
+                NVL(ML.NEWBORN_DATE, L.PATIENT_BIRTH) >= 29 AND
+                (MONTHS_BETWEEN(L.ADMISSION_DATE,
+                NVL(ML.NEWBORN_DATE, L.PATIENT_BIRTH)) / 12) &lt; 1 THEN
+                '2'
+                WHEN (MONTHS_BETWEEN(L.ADMISSION_DATE,
+                NVL(ML.NEWBORN_DATE, L.PATIENT_BIRTH)) / 12) >= 1 AND
+                (MONTHS_BETWEEN(L.ADMISSION_DATE,
+                NVL(ML.NEWBORN_DATE, L.PATIENT_BIRTH)) / 12) &lt; 17 THEN
+                '1'
+                ELSE
+                '0'
+                END AS AGE_TYPE, --参保人年龄类型
+                CASE
+                WHEN NVL(ML.NEWBORN_WEIGHT, L.PATIENT_WEIGHT * 1000) &lt; 1500 THEN
+                '1'
+                WHEN NVL(ML.NEWBORN_WEIGHT, L.PATIENT_WEIGHT * 1000) BETWEEN 1500 AND 2499 THEN
+                '2'
+                WHEN NVL(ML.NEWBORN_WEIGHT, L.PATIENT_WEIGHT * 1000) > 2499 THEN
+                '3'
+                ELSE
+                '3'
+                END AS WEIGHT_TYPE, --体重类型
+                DECODE(ML.ID, '', 0, 1) LOAD_FLAG,
+                ML.IS_UPLOAD_DATE UPLOAD_DATE,
+                L.BILLDATE BILL_DATE,
+                SYSDATE GROUP_DATE,
+                L.LONGTERM
+                FROM COMM.TD_SM_BILL L
+                INNER JOIN COMM.TB_HOSPITAL_VALID Z5
+                ON L.HOSPITAL_ID = Z5.HOSPITAL_ID
+                LEFT JOIN COMM.TD_MR_MEDICAL ML
+                ON L.ADMISSION_NUMBER = ML.ADMISSION_NO
+                AND L.HOSPITAL_ID = ML.HOSPTIAL_ID
+                AND ML.IS_UPLOAD = 1 --已上传数据
+                AND ML.IS_VALID = 0 --有效
+                AND ML.IS_GROUP_AVAILABLE = 1 --是否可以分组
+                WHERE  L.BILLDATE >= ?beging_date
+                AND L.BILLDATE &lt;?end_date) A;
+
+                <script>
+                    insert into td_drgs_in_hospital
+                    (GROUP_NO,
+                    HISID,
+                    PATIENT_SEX,
+                    AGE_TYPE,
+                    WEIGHT_TYPE,
+                    LOAD_FLAG,
+                    UPLOAD_DATE,
+                    BILL_DATE,
+                    GROUP_DATE,
+                    LONGTERM)
+                    values
+                    (${etl.globals['group_no']},
+                    ?HISID,
+                    ?PATIENT_SEX,
+                    ?AGE_TYPE,
+                    ?WEIGHT_TYPE,
+                    ?LOAD_FLAG,
+                    ?UPLOAD_DATE,
+                    ?BILL_DATE,
+                    ?GROUP_DATE,
+                    ?LONGTERM);
+                </script>
+            </query>
+
+            <!-- 月结分组流程、诊断信息准备 -->
+            <query>
+                select DISTINCT hisid,
+                mg.normal_code disease_id,
+                DECODE(disease, ICD10, 1, 0) AS FLAG
+                from (SELECT HOS.HISID,
+                decode(L.IS_UPLOAD,1,L.DISCHARGE_DISEASE_ID,SS.DISCHARGE_DISEASE_ID) as ICD10,
+                decode(L.IS_UPLOAD,1,L.DISCHARGE_DISEASE_ID,SS.DISCHARGE_DISEASE_ID) as DISCHARGE_DISEASE_ID,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE1, SS.DISEASE_ID) as DIAGNOSIS_CODE1,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE2,SS.SECOND_DISEASE_ID) as DIAGNOSIS_CODE2,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE3, SS.THIRD_DISEASE_ID) as DIAGNOSIS_CODE3,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE4, SS.DIAGNOSIS_FOUR) as DIAGNOSIS_CODE4,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE5, SS.DIAGNOSIS_FIVE) as DIAGNOSIS_CODE5,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE6, SS.DIAGNOSIS_SIX) as DIAGNOSIS_CODE6,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE7, SS.DIAGNOSIS_SEVEN) as DIAGNOSIS_CODE7,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE8, SS.DIAGNOSIS_EIGHT) as DIAGNOSIS_CODE8,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE9, SS.DIAGNOSIS_NINE) as DIAGNOSIS_CODE9,
+                decode(L.IS_UPLOAD, 1, L.DIAGNOSIS_CODE10, SS.DIAGNOSIS_TEN) as DIAGNOSIS_CODE10,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE11,SS.DIAGNOSIS_ELEVEN) as DIAGNOSIS_CODE11,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE12,SS.DIAGNOSIS_TWELVE) as DIAGNOSIS_CODE12,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE13,SS.DIAGNOSIS_THIRTEEN) as DIAGNOSIS_CODE13,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE14,SS.DIAGNOSIS_FOURTEEN) as DIAGNOSIS_CODE14,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE15,SS.DIAGNOSIS_FIFTEEN) as DIAGNOSIS_CODE15,
+                decode(L.IS_UPLOAD,1,L.DIAGNOSIS_CODE16,SS.DIAGNOSIS_SIXTEEN) as DIAGNOSIS_CODE16
+                FROM TD_DRGS_IN_HOSPITAL HOS
+                INNER JOIN COMM.TD_SM_BILL SS
+                ON HOS.HISID = SS.HISID
+                LEFT JOIN COMM.TD_MR_MEDICAL L
+                ON SS.ADMISSION_NUMBER = L.ADMISSION_NO
+                AND SS.HOSPITAL_ID = L.HOSPTIAL_ID
+                AND L.IS_UPLOAD = 1
+                AND L.IS_VALID = 0
+                AND L.IS_GROUP_AVAILABLE = 1
+                WHERE HOS.GROUP_NO = ${etl.globals['group_no']}) unpivot(disease for disease_name in(DISCHARGE_DISEASE_ID,
+                DIAGNOSIS_CODE1,
+                DIAGNOSIS_CODE2,
+                DIAGNOSIS_CODE3,
+                DIAGNOSIS_CODE4,
+                DIAGNOSIS_CODE5,
+                DIAGNOSIS_CODE6,
+                DIAGNOSIS_CODE7,
+                DIAGNOSIS_CODE8,
+                DIAGNOSIS_CODE9,
+                DIAGNOSIS_CODE10,
+                DIAGNOSIS_CODE11,
+                DIAGNOSIS_CODE12,
+                DIAGNOSIS_CODE13,
+                DIAGNOSIS_CODE14,
+                DIAGNOSIS_CODE15,
+                DIAGNOSIS_CODE16)) A
+                left join COMM.TB_DISEASE_MAPPING MG
+                ON A.disease = MG.CLIENT_CODE
+                where mg.normal_code is not null;
+                <script>
+                    insert into td_drgs_disease
+                    (group_no,
+                    hisid,
+                    disease_id,
+                    flag)
+                    values
+                    (${etl.globals['group_no']},
+                    ?HISID,
+                    ?disease_id,
+                    ?flag);
+                </script>
+            </query>
+
+            <!-- 月结分组流程、未上传病案手术信息准备 -->
+            <query>
+                SELECT A2.HISID,
+                UPPER(A1.ICD9_CODE) icd9,
+                SEQ_ID,
+                '' flag,
+                A2.ITEM_DATE,
+                SUM(A2.COSTS) AS COSTS,
+                A1.ICD10
+                FROM (SELECT SEQ_ID,
+                ITEM_ID,
+                ICD9_CODE,
+                ICD10_CODE ICD10,
+                COUNT(DISTINCT ITEM_ID) OVER(PARTITION BY SEQ_ID) ITEM_COUNT
+                FROM TB_OPR_CHARGE) A1
+                INNER JOIN (SELECT /*+ parallel(4) */ HISID, ITEM_DATE, STD_CODE, SUM(COSTS) AS COSTS
+                FROM (SELECT HOS.HISID,
+                TRUNC(D.ITEM_DATE) AS ITEM_DATE,
+                DD.STD_CODE,
+                D.COSTS,
+                SUM(D.COSTS) OVER(PARTITION BY hos.hisid,DD.STD_CODE ORDER BY 1) AS SUM_ITEM_COSTS
+                FROM TD_DRGS_IN_HOSPITAL HOS,
+                COMM.TD_SM_BILLDETAIL   D,
+                COMM.TB_STDCODEMAPPING  DD
+                WHERE HOS.HISID = D.PID
+                AND D.ITEM_ID = DD.CLIENT_CODE
+                AND D.PTYPE = '0'
+                AND HOS.GROUP_NO = ${etl.globals['group_no']}
+                AND HOS.LOAD_FLAG = 0
+                AND D.BILLDATE >= ?beging_date
+                AND D.BILLDATE &lt; ?end_date)
+                GROUP BY HISID, ITEM_DATE, STD_CODE
+                HAVING MAX(SUM_ITEM_COSTS) > 0) A2
+                ON UPPER(A1.ITEM_ID) = UPPER(A2.STD_CODE)
+                LEFT JOIN TD_DRGS_DISEASE E
+                ON A2.HISID = E.HISID
+                AND E.FLAG = 1
+                AND E.GROUP_NO = ${etl.globals['group_no']}
+                WHERE (A1.ICD10 IS NULL OR UPPER(A1.ICD10) = E.DISEASE_ID)
+                GROUP BY A2.HISID, A1.ICD9_CODE,SEQ_ID, A2.ITEM_DATE,A1.ICD10
+                HAVING COUNT(1) = MIN(A1.ITEM_COUNT) ;
+                <script>
+                    insert into td_drgs_operation
+                    (group_no,
+                    hisid,
+                    icd9,
+                    flag,
+                    costs,
+                    item_date,
+                    icd10,
+                    SEQ_ID)
+                    values(
+                    ${etl.globals['group_no']},
+                    ?HISID,
+                    ?icd9,
+                    ?flag,
+                    ?costs,
+                    ?item_date,
+                    ?icd10,
+                    ?SEQ_ID);
+                </script>
+            </query>
+
+            <!-- 月结分组流程、上传病案手术信息准备 -->
+            <query>
+                SELECT
+                SS.HISID,
+                OPERATION_CODE icd9,
+                IS_MAJOR_IDEN FLAG,
+                '' COSTS,
+                '' ITEM_DATE
+                FROM TD_DRGS_IN_HOSPITAL HOS
+                INNER JOIN COMM.TD_SM_BILL SS
+                ON HOS.HISID = SS.HISID
+                INNER JOIN COMM.TD_MR_MEDICAL L
+                ON SS.HOSPITAL_ID = L.HOSPTIAL_ID
+                AND SS.ADMISSION_NUMBER = L.ADMISSION_NO
+                INNER JOIN COMM.TD_MR_OPERATION N --手术信息表
+                ON L.ID = N.MEDICAL_ID
+                INNER JOIN COMM.TD_MR_OPERATIONDETAIL O --手术明细表
+                ON N.ID = O.OPERATION_ID
+                WHERE L.IS_UPLOAD = 1 --已上传数据
+                AND L.IS_VALID = 0 --有效
+                AND L.IS_GROUP_AVAILABLE = 1 --是否可以分组
+                AND HOS.GROUP_NO = ${etl.globals['group_no']}
+                AND HOS.LOAD_FLAG=1;
+                <script>
+                    insert into td_drgs_operation
+                    (group_no,
+                    hisid,
+                    icd9,
+                    flag,
+                    costs,
+                    item_date)
+                    values(
+                    ${etl.globals['group_no']},
+                    ?HISID,
+                    ?icd9,
+                    ?flag,
+                    ?costs,
+                    ?item_date);
+                </script>
+            </query>
+
+            <!-- 日常分组流程、呼吸机明细项目准备 -->
+            <query>
+                SELECT  HISID, STD_CODE,'MCC' as DESCRIPTION
+                FROM (SELECT /*+ parallel(4) */ DISTINCT HOS.HISID,
+                UPPER(DD.STD_CODE) AS STD_CODE,
+                SUM(D.COSTS) OVER(PARTITION BY HOS.HISID, DD.STD_CODE ORDER BY 1) AS SUM_ITEM_COSTS
+                FROM TD_DRGS_IN_HOSPITAL    HOS,
+                COMM.TD_SM_BILLDETAIL  D,
+                COMM.TB_STDCODEMAPPING DD
+                WHERE HOS.HISID = D.PID
+                AND D.ITEM_ID = DD.CLIENT_CODE
+                AND HOS.GROUP_NO = ${etl.globals['group_no']}
+                AND D.BILLDATE >= ?beging_date
+                AND D.BILLDATE &lt;?end_date) A
+                WHERE A.SUM_ITEM_COSTS > 0
+                AND EXISTS (SELECT NULL
+                FROM TB_HBZ_CHARGE_MCC T
+                WHERE A.STD_CODE = UPPER(T.STD_CODE));
+                <script>
+                    insert into td_drgs_item
+                    (group_no,
+                    hisid,
+                    std_code,
+                    DESCRIPTION)
+                    values
+                    (${etl.globals['group_no']},
+                    ?hisid,
+                    ?std_code,
+                    ?DESCRIPTION);
+                </script>
+            </query>
+
+            <!-- 日常分组流程、其他因素明细项目准备 -->
+            <query>
+                SELECT  HISID, STD_CODE,'FACTOR_ITEM_ID' as DESCRIPTION
+                FROM (SELECT /*+ parallel(4) */ DISTINCT HOS.HISID,
+                UPPER(DD.STD_CODE) AS STD_CODE,
+                SUM(D.COSTS) OVER(PARTITION BY HOS.HISID, DD.STD_CODE ORDER BY 1) AS SUM_ITEM_COSTS
+                FROM TD_DRGS_IN_HOSPITAL    HOS,
+                COMM.TD_SM_BILLDETAIL  D,
+                COMM.TB_STDCODEMAPPING DD
+                WHERE HOS.HISID = D.PID
+                AND D.ITEM_ID = DD.CLIENT_CODE
+                AND HOS.GROUP_NO = ${etl.globals['group_no']}
+                AND D.BILLDATE >= ?beging_date
+                AND D.BILLDATE &lt;?end_date) A
+                WHERE A.SUM_ITEM_COSTS > 0
+                AND EXISTS (SELECT NULL
+                FROM TB_OTHER_FACTOR T
+                WHERE A.STD_CODE = UPPER(T.FACTOR_ITEM_ID));
+                <script>
+                    insert into td_drgs_item
+                    (group_no,
+                    hisid,
+                    std_code,
+                    DESCRIPTION)
+                    values
+                    (${etl.globals['group_no']},
+                    ?hisid,
+                    ?std_code,
+                    ?DESCRIPTION);
+                </script>
+            </query>
+        </query>
+        </query>
+</etl>

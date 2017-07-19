@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DrgsGroupRecordMapper">
+    <resultMap id="drgsGroupRecordResult" type="cn.com.cis.module.drgsgroup.entity.DrgsGroupRecord">
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="groupDate" column="GROUP_DATE" />
+        <result property="groupCount" column="GROUP_COUNT" />
+        <result property="groupTime" column="GROUP_TIME" />
+        <result property="groupState" column="GROUP_STATE" />
+        <result property="message" column="MESSAGE" />
+    </resultMap>
+
+	<select id="selectAllDrgsGroupRecords" resultMap="drgsGroupRecordResult">
+		SELECT
+		    GROUP_NO, 
+			GROUP_DATE,
+			GROUP_COUNT,
+			GROUP_TIME,
+			GROUP_STATE,
+			MESSAGE
+		FROM TD_DRGS_CONTROLL
+		WHERE GROUP_STATE='0'
+	</select>
+	
+	<update id="updateDrgsGroupRecord" parameterType="DrgsGroupRecord">
+    	UPDATE TD_DRGS_CONTROLL 
+		  <trim prefix="set" suffixOverrides=",">
+			  <if test="groupDate != null">
+			      GROUP_DATE = #{groupDate},
+			  </if>
+			  <if test="groupCount != null">
+			      GROUP_COUNT = #{groupCount},
+			  </if>
+			  <if test="groupTime != null">
+			  	   GROUP_TIME = #{groupTime},
+			  </if>
+			  <if test="groupState != null and groupState != ''">
+			      GROUP_STATE = #{groupState},
+			  </if>
+			  <if test="message != null and message != ''">
+			      MESSAGE = #{message},
+			  </if>
+		 </trim>
+		 WHERE GROUP_NO = #{groupNo}
+    </update>
+</mapper>

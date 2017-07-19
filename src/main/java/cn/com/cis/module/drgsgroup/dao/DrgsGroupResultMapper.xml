@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DrgsGroupResultMapper">
+    <resultMap id="drgsGroupResultResult" type="cn.com.cis.module.drgsgroup.entity.DrgsGroupResult">
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="hisId" column="HISID" />
+        <result property="uploadDate" column="UPLOAD_DATE" jdbcType="DATE"/>
+        <result property="drgsCode" column="DRGS_CODE" />
+        <result property="icd10" column="ICD10" />
+        <result property="primaryDiagnosisCode" column="ICD10_1TO16" />
+        <result property="icd9" column="OPR_MAIN_ICD9" />
+        <result property="unMainOprStr" column="NMAIN_OPR_STR" />
+        <result property="groupDate" column="GROUP_DATE" jdbcType="DATE"/>
+        <result property="loadFlag" column="UPLOAD_FLAG" />
+        <result property="matchCount" column="MATCH_COUNT" />
+    </resultMap>
+
+	<select id="selectAllDrgsGroupResults" resultMap="drgsGroupResultResult">
+		SELECT
+		    GROUP_NO, 
+			HISID,
+			UPLOAD_DATE,
+			DRGS_CODE,
+			ICD10,
+			ICD10_1TO16,
+			OPR_MAIN_ICD9,
+			NMAIN_OPR_STR,
+			UPLOAD_FLAG,
+			GROUP_DATE,
+			MATCH_COUNT
+		FROM TD_DRGS_GROUP_RESULT
+	</select>
+	
+	<insert id="insertDrgsGroupResult" parameterType="DrgsGroupResult">
+        INSERT INTO TD_DRGS_GROUP_RESULT
+          (GROUP_NO,
+           HISID,
+           UPLOAD_DATE,
+           DRGS_CODE,
+           ICD10,
+		   ICD10_1TO16,
+		   OPR_MAIN_ICD9,
+		   NMAIN_OPR_STR,
+		   GROUP_DATE,
+		   UPLOAD_FLAG,
+		   MATCH_COUNT)
+        VALUES
+          (#{groupNo},
+           #{hisId},
+           #{uploadDate},
+           #{drgsCode},
+           #{icd10},
+           #{primaryDiagnosisCode},
+           #{icd9},
+           #{unMainOprStr},
+           #{groupDate},
+           #{loadFlag},
+           #{matchCount})
+    </insert>
+    
+    <insert id="batchInsertDrgsGroupResults" parameterType="java.util.List"  useGeneratedKeys="false">
+        INSERT INTO TD_DRGS_GROUP_RESULT
+          (GROUP_NO,
+           HISID,
+           UPLOAD_DATE,
+           DRGS_CODE,
+           ICD10,
+		   ICD10_1TO16,
+		   OPR_MAIN_ICD9,
+		   NMAIN_OPR_STR,
+		   GROUP_DATE,
+		   UPLOAD_FLAG,
+		   MATCH_COUNT)
+        <foreach collection="list" item="item" index="index" separator="union all" >  
+         (SELECT 
+         #{item.groupNo},
+           #{item.hisId},
+           #{item.uploadDate,jdbcType=DATE},
+           #{item.drgsCode},
+           #{item.icd10},
+           #{item.primaryDiagnosisCode},
+           #{item.icd9},
+           #{item.unMainOprStr},
+           #{item.groupDate,jdbcType=DATE},
+           #{item.loadFlag},
+           #{item.matchCount} 
+           FROM DUAL) 
+        </foreach> 
+    </insert>
+</mapper>

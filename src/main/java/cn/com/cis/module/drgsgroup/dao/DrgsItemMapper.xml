@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="cn.com.cis.module.drgsgroup.dao.DrgsItemMapper">
+    <resultMap id="drgsItemResult" type="cn.com.cis.module.drgsgroup.entity.DrgsItem">
+        <result property="hisId" column="HISID" />
+        <result property="groupNo" column="GROUP_NO" />
+        <result property="stdCode" column="STD_CODE" />
+        <result property="description" column="DESCRIPTION" />
+        <association property="drgsData" javaType="cn.com.cis.module.drgsgroup.entity.DrgsData"/>
+    </resultMap>
+    
+    <select id="getAllDrgsItems" resultMap="drgsItemResult" parameterType="cn.com.cis.module.drgsgroup.entity.DrgsData">
+		SELECT 
+			* 
+			FROM TD_DRGS_ITEM 
+			WHERE GROUP_NO=#{groupNo} AND HISID=#{hisId}
+    </select>
+    
+</mapper>
